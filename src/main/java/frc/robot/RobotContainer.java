@@ -79,8 +79,18 @@ public class RobotContainer {
                     .withVelocityY(slewrateLimiterVelY.calculate(((MathUtil.applyDeadband(-joystick.getLeftX(), .1)))* MaxSpeed)/4) // Drive left with negative X (left)
                     .withRotationalRate(slewrateLimiterVelRot.calculate(((MathUtil.applyDeadband(-joystick.getRightX(), .1)))* MaxAngularRate)/3.14) // Drive counterclockwise with negative X (left)
             ));  
-
-
+        
+        //Comandos para rotar
+        joystick.x().whileTrue(drivetrain.applyRequest(() ->
+                turtleDrive.withVelocityX(slewrateLimiterVelX.calculate(((MathUtil.applyDeadband(-joystick.getLeftY(), .1))) * MaxSpeed)/4) // Drive forward with negative Y (forward)
+                    .withVelocityY(slewrateLimiterVelY.calculate(((MathUtil.applyDeadband(-joystick.getLeftX(), .1)))* MaxSpeed)/4) // Drive left with negative X (left)
+                    .withRotationalRate(drivetrain.aimHub())) // Drive counterclockwise with negative X (left)
+        );
+        joystick.y().whileTrue(drivetrain.applyRequest(() ->
+                turtleDrive.withVelocityX(slewrateLimiterVelX.calculate(((MathUtil.applyDeadband(-joystick.getLeftY(), .1))) * MaxSpeed)/4) // Drive forward with negative Y (forward)
+                    .withVelocityY(slewrateLimiterVelY.calculate(((MathUtil.applyDeadband(-joystick.getLeftX(), .1)))* MaxSpeed)/4) // Drive left with negative X (left)
+                    .withRotationalRate(drivetrain.aimAt(180)) // Drive counterclockwise with negative X (left)
+            ));
 
         // Idle while the robot is disabled. This ensures the configured
         // neutral mode is applied to the drive motors while disabled.

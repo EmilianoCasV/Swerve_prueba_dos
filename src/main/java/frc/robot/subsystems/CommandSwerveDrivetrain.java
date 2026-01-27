@@ -34,6 +34,7 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
@@ -60,7 +61,7 @@ import frc.robot.generated.TunerConstants.TunerSwerveDrivetrain;
  * https://v6.docs.ctr-electronics.com/en/stable/docs/tuner/tuner-swerve/index.html
  */
 public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Subsystem {
-    PIDController aimingPidController = new PIDController(0.33, 0, 0);
+    PIDController aimingPidController = new PIDController(5, 0, 0);
     private  Constants m_Constants = new Constants();
     private double lastTag = 1;
 
@@ -255,20 +256,51 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
       }
     }
 
-    public double atHub(){
-        aimingPidController.enableContinuousInput(-180, 180);
-        double x_robot = getState().Pose.getX();
-        double y_robot = getState().Pose.getY();
-        //double distance = Math.sqrt(( 11.920-x_robot)+(4.030-y_robot));
-        double angle = Math.atan2((4.030-y_robot),(11.920-x_robot));
-        return (aimingPidController.calculate(getHeading().getDegrees(),angle));
+    public Rotation2d getHUbRotation2d(){
+        Rotation2d HUB;
+        Boolean allianceBlue = DriverStation.getAlliance().get() == Alliance.Blue;
+        if (allianceBlue){
+            Pose2d hubPose = Constants.hubPositionBLUE.BlueHub;
+            Translation2d relativeTrl= hubPose.relativeTo(new Pose2d()).getTranslation();
+             HUB = new Rotation2d(relativeTrl.getX(),relativeTrl.getY()).plus(getHeading());
+        }
+        else {
+            Pose2d hubPose = Constants.hubPositionRED.RedHub;
+            Translation2d relativeTrl= hubPose.relativeTo(new Pose2d()).getTranslation();
+             HUB = new Rotation2d(relativeTrl.getX(),relativeTrl.getY()).plus(getHeading());
+        }
+        return HUB;       
     }
 
-    
+
+    public Rotation2d getHubYaw(){
+        AprilTagFieldLayout aprilTagFieldLayout = AprilTagFields.k2025ReefscapeWelded.loadAprilTagLayoutField();
+        int allianceAprilTag = DriverStation.getAlliance().get() == Alliance.Blue ? 10 : 25;
+
+        Pose3d hubAprilTagPose = aprilTagFieldLayout.getTagPose(allianceAprilTag).get();
+        Translation2d relativeTrl = hubAprilTagPose.toPose2d().relativeTo(new Pose2d()).getTranslation();
+        return new  Rotation2d(relativeTrl.getX(),relativeTrl.getY()).plus(getHeading());
+    }
+
+    public Pose2d pose_limelight(){
+        return LimelightHelpers.getBotPose2d("light-line");
+    }
+
+
+
+    public double aimHub(){
+        aimingPidController.enableContinuousInput(-180, 180);
+        return(aimingPidController.calculate(getHeading().getDegrees(), getHUbRotation2d().getDegrees()));
+    }
+
     private Rotation2d getHeading(){
         return getState().Pose.getRotation();
     }
 
+    public double aimAt(double angle){
+        aimingPidController.enableContinuousInput(-180, 180);
+    return (aimingPidController.calculate(getHeading().getDegrees(), angle));
+    }
 
     /**
      * Returns a command that applies the specified control request to this swerve drivetrain.
@@ -287,6 +319,9 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
         SmartDashboard.putNumber("Brownout Voltage", RobotController.getBrownoutVoltage());
         SmartDashboard.putNumber("Angle Robot", getState().Pose.getRotation().getDegrees());
         SmartDashboard.putBoolean("isAtReference", alignFinalController.atReference());
+        SmartDashboard.putNumber("Angle_HUB", getHUbRotation2d().getDegrees());
+        SmartDashboard.putNumber("outup_PID_yaw", aimHub());
+        SmartDashboard.putString("Alliance Rojo", DriverStation.getAlliance().get().toString());
     //    rumble(RobotContainer.driverHID, RobotContainer.opHID);
         ll3gPose();
         llFeederPose();

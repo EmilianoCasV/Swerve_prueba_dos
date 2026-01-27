@@ -4,6 +4,9 @@
 
 package frc.robot;
 
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+
 /** Add your docs here. */
 public class Constants {
         
@@ -12,12 +15,11 @@ public class Constants {
     }
 
     public static class hubPositionRED {
-        private final double HUB_red_X = 11.920;
-        private final double HUB_red_y = 4.030;   
+        public static final Pose2d RedHub = new Pose2d(4.628,4.024, Rotation2d.fromDegrees(0));
     }
 
     public static class hubPositionBLUE{
-        
+        public static final Pose2d BlueHub = new Pose2d(11.912,4.024, Rotation2d.fromDegrees(-180));
     }
 
     public static final double HUB_red_X = 0;
