@@ -234,7 +234,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
      * This constructs the underlying hardware devices, so users should not construct
      * the devices themselves. If they need the devices, they can access them through
      * getters in the classes.
-     *
+     *GET
      * @param drivetrainConstants       Drivetrain-wide constants for the swerve drive
      * @param odometryUpdateFrequency   The frequency to run the odometry loop. If
      *                                  unspecified or set to 0 Hz, this is 250 Hz on
@@ -337,7 +337,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 
 
     public Rotation2d getHubYaw(){
-        AprilTagFieldLayout aprilTagFieldLayout = AprilTagFields.k2025ReefscapeWelded.loadAprilTagLayoutField();
+        AprilTagFieldLayout aprilTagFieldLayout = AprilTagFields.k2026RebuiltAndymark.loadAprilTagLayoutField();
         int allianceAprilTag = DriverStation.getAlliance().get() == Alliance.Blue ? 10 : 25;
 
         Pose3d hubAprilTagPose = aprilTagFieldLayout.getTagPose(allianceAprilTag).get();
