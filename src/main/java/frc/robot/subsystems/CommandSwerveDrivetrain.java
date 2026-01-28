@@ -66,7 +66,6 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     private final SwerveRequest.ApplyRobotSpeeds m_pathApplyRobotSpeeds = new SwerveRequest.ApplyRobotSpeeds();
     private double lastTag = 1;
 
-
     //Autoalign stuff here
     private List<Pose2d> poseList = new ArrayList<>();
     private boolean isAtAngleTest = false;
@@ -102,72 +101,6 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     /* Keep track if we've ever applied the operator perspective before or not */
     private boolean m_hasAppliedOperatorPerspective = false;
 
-    /* Swerve requests to apply during SysId characterization */
-    private final SwerveRequest.SysIdSwerveTranslation m_translationCharacterization = new SwerveRequest.SysIdSwerveTranslation();
-    private final SwerveRequest.SysIdSwerveSteerGains m_steerCharacterization = new SwerveRequest.SysIdSwerveSteerGains();
-    private final SwerveRequest.SysIdSwerveRotation m_rotationCharacterization = new SwerveRequest.SysIdSwerveRotation();
-
-    /* SysId routine for characterizing translation. This is used to find PID gains for the drive motors. */
-    private final SysIdRoutine m_sysIdRoutineTranslation = new SysIdRoutine(
-        new SysIdRoutine.Config(
-            null,        // Use default ramp rate (1 V/s)
-            Volts.of(4), // Reduce dynamic step voltage to 4 V to prevent brownout
-            null,        // Use default timeout (10 s)
-            // Log state with SignalLogger class
-            state -> SignalLogger.writeString("SysIdTranslation_State", state.toString())
-        ),
-        new SysIdRoutine.Mechanism(
-            output -> setControl(m_translationCharacterization.withVolts(output)),
-            null,
-            this
-        )
-    );
-
-    /* SysId routine for characterizing steer. This is used to find PID gains for the steer motors. */
-    private final SysIdRoutine m_sysIdRoutineSteer = new SysIdRoutine(
-        new SysIdRoutine.Config(
-            null,        // Use default ramp rate (1 V/s)
-            Volts.of(7), // Use dynamic voltage of 7 V
-            null,        // Use default timeout (10 s)
-            // Log state with SignalLogger class
-            state -> SignalLogger.writeString("SysIdSteer_State", state.toString())
-        ),
-        new SysIdRoutine.Mechanism(
-            volts -> setControl(m_steerCharacterization.withVolts(volts)),
-            null,
-            this
-        )
-    );
-
-    /*
-     * SysId routine for characterizing rotation.
-     * This is used to find PID gains for the FieldCentricFacingAngle HeadingController.
-     * See the documentation of SwerveRequest.SysIdSwerveRotation for info on importing the log to SysId.
-     */
-    private final SysIdRoutine m_sysIdRoutineRotation = new SysIdRoutine(
-        new SysIdRoutine.Config(
-            /* This is in radians per second², but SysId only supports "volts per second" */
-            Volts.of(Math.PI / 6).per(Second),
-            /* This is in radians per second, but SysId only supports "volts" */
-            Volts.of(Math.PI),
-            null, // Use default timeout (10 s)
-            // Log state with SignalLogger class
-            state -> SignalLogger.writeString("SysIdRotation_State", state.toString())
-        ),
-        new SysIdRoutine.Mechanism(
-            output -> {
-                /* output is actually radians per second, but SysId only supports "volts" */
-                setControl(m_rotationCharacterization.withRotationalRate(output.in(Volts)));
-                /* also log the requested output for SysId */
-                SignalLogger.writeDouble("Rotational_Rate", output.in(Volts));
-            },
-            null,
-            this
-        )
-    );
-
-    /* The SysId routine to test */
-    private SysIdRoutine m_sysIdRoutineToApply = m_sysIdRoutineTranslation;
 
     /**
      * Constructs a CTRE SwerveDrivetrain using the specified constants.
@@ -285,10 +218,10 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
             DriverStation.reportError("Failed to load PathPlanner config and configure AutoBuilder", ex.getStackTrace());
         }
     }
+
     private void ll3gPose(){
         
         if (kUseLimelight) {
-
             LimelightHelpers.SetRobotOrientation("limelight-good", getState().Pose.getRotation().getDegrees(), 0, 0, 0, 0, 0);
             var llMeasurement = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2("limelight-good");
             if (llMeasurement != null && llMeasurement.tagCount>=1) {
@@ -303,34 +236,18 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     }
   
 
-   private void llFeederPose(){
-    if (kUseLimelight) {
-
-        LimelightHelpers.SetRobotOrientation("limelight-good", getState().Pose.getRotation().getDegrees(), 0, 0, 0, 0, 0);
-        var llMeasurement = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2("limelight-good");
-        
-        if (llMeasurement != null && llMeasurement.tagCount>=1 ) {
-            SmartDashboard.putNumber("FeederTagDistance", llMeasurement.avgTagDist);
-            if(llMeasurement.avgTagDist<=1.2){
-
-          addVisionMeasurement(llMeasurement.pose, Utils.fpgaToCurrentTime(llMeasurement.timestampSeconds));}
-        }
-        
-      }
-    }
-
     public Rotation2d getHUbRotation2d(){
         Rotation2d HUB;
         Boolean allianceBlue = DriverStation.getAlliance().get() == Alliance.Blue;
         if (allianceBlue){
             Pose2d hubPose = Constants.hubPositionBLUE.BlueHub;
             Translation2d relativeTrl= hubPose.relativeTo(new Pose2d()).getTranslation();
-             HUB = new Rotation2d(relativeTrl.getX(),relativeTrl.getY()).plus(getHeading());
+             HUB = new Rotation2d(relativeTrl.getX(),relativeTrl.getY());
         }
         else {
             Pose2d hubPose = Constants.hubPositionRED.RedHub;
             Translation2d relativeTrl= hubPose.relativeTo(new Pose2d()).getTranslation();
-             HUB = new Rotation2d(relativeTrl.getX(),relativeTrl.getY()).plus(getHeading());
+             HUB = new Rotation2d(relativeTrl.getX(),relativeTrl.getY());
         }
         return HUB;       
     }
@@ -338,23 +255,28 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 
     public Rotation2d getHubYaw(){
         AprilTagFieldLayout aprilTagFieldLayout = AprilTagFields.k2026RebuiltAndymark.loadAprilTagLayoutField();
-        int allianceAprilTag = DriverStation.getAlliance().get() == Alliance.Blue ? 10 : 25;
-
+        int allianceAprilTag = DriverStation.getAlliance().get() == Alliance.Blue ? 25 : 10;
+        
         Pose3d hubAprilTagPose = aprilTagFieldLayout.getTagPose(allianceAprilTag).get();
         Translation2d relativeTrl = hubAprilTagPose.toPose2d().relativeTo(new Pose2d()).getTranslation();
         return new  Rotation2d(relativeTrl.getX(),relativeTrl.getY()).plus(getHeading());
     }
 
-    public Pose2d pose_limelight(){
-        return LimelightHelpers.getBotPose2d("light-line");
+    public Rotation2d getHubYaw_two(){
+        AprilTagFieldLayout aprilTagFieldLayout = AprilTagFields.k2026RebuiltAndymark.loadAprilTagLayoutField();
+        int allianceAprilTag = DriverStation.getAlliance().get() == Alliance.Blue ? 25 : 10;
+        
+    
+        Pose3d hubAprilTagPose = aprilTagFieldLayout.getTagPose(allianceAprilTag).get();
+        Translation2d relativeTrl = hubAprilTagPose.toPose2d().getTranslation().minus(getState().Pose.getTranslation());
+        return new  Rotation2d(relativeTrl.getX(),relativeTrl.getY());
     }
 
-
-
-    public double aimHub(){
-        aimingPidController.enableContinuousInput(-180, 180);
-        return(aimingPidController.calculate(getHeading().getDegrees(), getHUbRotation2d().getDegrees()));
+    public Rotation2d angle(){
+        Rotation2d angle_m = new Rotation2d(getState().Pose.getX()-11.912,getState().Pose.getY()-4.024);
+        return angle_m;
     }
+
 
     private Rotation2d getHeading(){
         return getState().Pose.getRotation();
@@ -380,14 +302,26 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     public void periodic() {
         SmartDashboard.putNumber("Battery Voltage", RobotController.getBatteryVoltage());
         SmartDashboard.putNumber("Brownout Voltage", RobotController.getBrownoutVoltage());
+
         SmartDashboard.putNumber("Angle Robot", getState().Pose.getRotation().getDegrees());
+        SmartDashboard.putNumber("Position_X_robot",getState().Pose.getX());
+        SmartDashboard.putNumber("Position_Y_robot",getState().Pose.getY());
+        
         SmartDashboard.putBoolean("isAtReference", alignFinalController.atReference());
         SmartDashboard.putNumber("Angle_HUB", getHUbRotation2d().getDegrees());
-        SmartDashboard.putNumber("outup_PID_yaw", aimHub());
+        SmartDashboard.putNumber("angle_April", getHubYaw().getDegrees());
+
         SmartDashboard.putString("Alliance Rojo", DriverStation.getAlliance().get().toString());
+
+        SmartDashboard.putNumber("Angle_HUB_simple", angle().getDegrees());
+        SmartDashboard.putNumber("HUB_ANGLE_VALUE_POS", getHubYaw_two().getDegrees());
+
+
+        
     //    rumble(RobotContainer.driverHID, RobotContainer.opHID);
         ll3gPose();
-        llFeederPose();
+        getHubYaw();
+        
 
 
 

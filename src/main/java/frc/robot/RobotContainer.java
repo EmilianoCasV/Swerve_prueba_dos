@@ -60,7 +60,12 @@ public class RobotContainer {
         RobotModeTriggers.disabled().whileTrue(
             drivetrain.applyRequest(() -> idle).ignoringDisable(true)
         );
-
+        joystick.leftTrigger().whileTrue(
+             drivetrain.applyRequest(() ->
+                drive.withVelocityX((-joystick.getLeftY() * MaxSpeed/4)) // Drive forward with negative Y (forward)
+                    .withVelocityY(-(joystick.getLeftX() * MaxSpeed/4)) // Drive left with negative X (left)
+                    .withRotationalRate((-joystick.getRightX() * MaxAngularRate)/2))
+        );
         joystick.a().whileTrue(drivetrain.applyRequest(() -> brake));
         joystick.b().whileTrue(drivetrain.applyRequest(() ->
             point.withModuleDirection(new Rotation2d(-joystick.getLeftY(), -joystick.getLeftX()))

@@ -19,7 +19,7 @@ public class Constants {
     }
 
     public static class hubPositionBLUE{
-        public static final Pose2d BlueHub = new Pose2d(4.628,4.024, Rotation2d.fromDegrees(-180));
+        public static final Pose2d BlueHub = new Pose2d(4.628,4.024, Rotation2d.fromDegrees(0));
     }
 
     public static final double HUB_red_X = 0;
