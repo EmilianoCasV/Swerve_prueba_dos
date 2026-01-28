@@ -8,16 +8,9 @@ import static edu.wpi.first.units.Units.*;
 
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
-import com.pathplanner.lib.auto.AutoBuilder;
-import com.pathplanner.lib.auto.NamedCommands;
 
-import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.filter.SlewRateLimiter;
+import edu.wpi.first.apriltag.AprilTagFields;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.wpilibj.Joystick;
-import edu.wpi.first.wpilibj.XboxController;
-import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -28,38 +21,25 @@ import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 
 public class RobotContainer {
-    private final SendableChooser<Command> autoChooser;
-
     private double MaxSpeed = 1.0 * TunerConstants.kSpeedAt12Volts.in(MetersPerSecond); // kSpeedAt12Volts desired top speed
     private double MaxAngularRate = RotationsPerSecond.of(0.75).in(RadiansPerSecond); // 3/4 of a rotation per second max angular velocity
 
-    public final SwerveRequest.RobotCentric alignDrive = new SwerveRequest.RobotCentric().withDriveRequestType(DriveRequestType.OpenLoopVoltage);
     /* Setting up bindings for necessary control of the swerve drive platform */
     private final SwerveRequest.FieldCentric drive = new SwerveRequest.FieldCentric()
             .withDeadband(MaxSpeed * 0.1).withRotationalDeadband(MaxAngularRate * 0.1) // Add a 10% deadband
             .withDriveRequestType(DriveRequestType.OpenLoopVoltage); // Use open-loop control for drive motors
     private final SwerveRequest.SwerveDriveBrake brake = new SwerveRequest.SwerveDriveBrake();
     private final SwerveRequest.PointWheelsAt point = new SwerveRequest.PointWheelsAt();
-    private final SwerveRequest.FieldCentric turtleDrive = new SwerveRequest.FieldCentric().withDriveRequestType(DriveRequestType.OpenLoopVoltage);
 
     private final Telemetry logger = new Telemetry(MaxSpeed);
 
-    private static final CommandXboxController joystick = new CommandXboxController(0);
-    private static final CommandXboxController operator = new CommandXboxController(1);
-    public static final XboxController driverHID = joystick.getHID();
-    public static final XboxController opHID = operator.getHID();
-
+    private final CommandXboxController joystick = new CommandXboxController(0);
 
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
-    SlewRateLimiter slewrateLimiterVelX = new SlewRateLimiter(10);
-    SlewRateLimiter slewrateLimiterVelY = new SlewRateLimiter(10);
-    SlewRateLimiter slewrateLimiterVelRot = new SlewRateLimiter(10);
 
     public RobotContainer() {
-
-        autoChooser = AutoBuilder.buildAutoChooser();
-        SmartDashboard.putData("Auto Chooser", autoChooser);
         configureBindings();
+    
     }
 
     private void configureBindings() {
@@ -74,24 +54,6 @@ public class RobotContainer {
             )
         );
 
-            joystick.leftTrigger().whileTrue( drivetrain.applyRequest(()->
-                turtleDrive.withVelocityX(slewrateLimiterVelX.calculate(((MathUtil.applyDeadband(-joystick.getLeftY(), .1))) * MaxSpeed)/4) // Drive forward with negative Y (forward)
-                    .withVelocityY(slewrateLimiterVelY.calculate(((MathUtil.applyDeadband(-joystick.getLeftX(), .1)))* MaxSpeed)/4) // Drive left with negative X (left)
-                    .withRotationalRate(slewrateLimiterVelRot.calculate(((MathUtil.applyDeadband(-joystick.getRightX(), .1)))* MaxAngularRate)/3.14) // Drive counterclockwise with negative X (left)
-            ));  
-        
-        //Comandos para rotar
-        joystick.x().whileTrue(drivetrain.applyRequest(() ->
-                turtleDrive.withVelocityX(slewrateLimiterVelX.calculate(((MathUtil.applyDeadband(-joystick.getLeftY(), .1))) * MaxSpeed)/4) // Drive forward with negative Y (forward)
-                    .withVelocityY(slewrateLimiterVelY.calculate(((MathUtil.applyDeadband(-joystick.getLeftX(), .1)))* MaxSpeed)/4) // Drive left with negative X (left)
-                    .withRotationalRate(drivetrain.aimHub())) // Drive counterclockwise with negative X (left)
-        );
-        joystick.y().whileTrue(drivetrain.applyRequest(() ->
-                turtleDrive.withVelocityX(slewrateLimiterVelX.calculate(((MathUtil.applyDeadband(-joystick.getLeftY(), .1))) * MaxSpeed)/4) // Drive forward with negative Y (forward)
-                    .withVelocityY(slewrateLimiterVelY.calculate(((MathUtil.applyDeadband(-joystick.getLeftX(), .1)))* MaxSpeed)/4) // Drive left with negative X (left)
-                    .withRotationalRate(drivetrain.aimAt(180)) // Drive counterclockwise with negative X (left)
-            ));
-
         // Idle while the robot is disabled. This ensures the configured
         // neutral mode is applied to the drive motors while disabled.
         final var idle = new SwerveRequest.Idle();
@@ -104,6 +66,9 @@ public class RobotContainer {
             point.withModuleDirection(new Rotation2d(-joystick.getLeftY(), -joystick.getLeftX()))
         ));
 
+        // Run SysId routines when holding back/start and X/Y.
+        // Note that each routine should be run exactly once in a single log.
+
 
         // Reset the field-centric heading on left bumper press.
         joystick.leftBumper().onTrue(drivetrain.runOnce(drivetrain::seedFieldCentric));
@@ -112,7 +77,21 @@ public class RobotContainer {
     }
 
     public Command getAutonomousCommand() {
-        // Simple drive forward auto
-        return autoChooser.getSelected();
+        // Simple drive forward auton
+        final var idle = new SwerveRequest.Idle();
+        return Commands.sequence(
+            // Reset our field centric heading to match the robot
+            // facing away from our alliance station wall (0 deg).
+            drivetrain.runOnce(() -> drivetrain.seedFieldCentric(Rotation2d.kZero)),
+            // Then slowly drive forward (away from us) for 5 seconds.
+            drivetrain.applyRequest(() ->
+                drive.withVelocityX(0.5)
+                    .withVelocityY(0)
+                    .withRotationalRate(0)
+            )
+            .withTimeout(5.0),
+            // Finally idle for the rest of auton
+            drivetrain.applyRequest(() -> idle)
+        );
     }
 }
